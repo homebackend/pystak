@@ -1,0 +1,10 @@
+aiofiles
+aiohttp
+aiohttp_xmlrpc
+internetarchive
+libtorrent
+lxml
+pysmartdl2
+tqdm
+telethon
+
