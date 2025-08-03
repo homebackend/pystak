@@ -5,7 +5,7 @@
 [![MIT License][license-shield]][license-url]
 [![LinkedIn][linkedin-shield]][linkedin-url]
 
-# pystak
+# About pystak
 **pystak** is a command line tool to download books from various sources written in [Python 3](https://www.python.org/). Currently the following sources are supported:
 - [Anna's Archive](https://annas-archive.org/)
 - [Internet Archive](https://archive.org/)
@@ -47,6 +47,8 @@ To deactivate the virtual environment run the command: `deactivate`.
 
 **pystak** supports search and download subcommands which allow searching and downloading of books respectively. Different sources may support additional sub commands.
 **pystak** command exits only after all files have been downloaded. You can exit from the command at any time by pressing `ctrl+c`. **pystak** starts to resume downloading from where it left on subsequent reissuing of the same command.
+
+A summary of the entire process is printed when the process exits.
 
 ### Downloading books
 
@@ -133,6 +135,9 @@ to check whether another **pystak** command is executing somewhere.
 ### Internet archive
 
 The download is fully resumable on running the command again.
+
+For some files you might see a message like: `access to item is restricted`. Such files are either not downloadable or require login.
+When downloadable use the following tool: https://github.com/MiniGlome/Archive.org-Downloader to download these files.
 
 ### Indian Culture
 
