@@ -340,14 +340,12 @@ class Downloader(ABC):
                             headers=None):
         """Helper function to download a URL."""
 
-        
         if sha1_hash is None:
             # for files for which sha1_hash is not present we check
-            # if file {file_path}-hash exists and does it have the 
+            # if file {file_path}-hash exists and does it have the
             # correct hash
             if not await self.is_file_already_downloaded(file_path):
                 return True, size
-
 
         count = 0
 
@@ -607,6 +605,8 @@ class Downloader(ABC):
         """Save current download results"""
         with open(f'run-end-{time.time()}.txt', 'w', encoding='utf-8') as f:
             f.write(json.dumps({
+                'run': self.NAME,
+                'config': self.config,
                 'final_results': self.final_results,
                 'stats': self.stats,
                 'pending_urls': list(self.pending_urls),
@@ -1395,6 +1395,8 @@ class TorrentDownloader(SourceHtmlPageDownloader):
 class AnnasDownloader(TorrentDownloader):
     """Annas Archive downloader class"""
 
+    NAME = 'annas'
+
     def __init__(self, args):
         my_config = {
             'torrent_cache_file': args.torrent_cache_file,
@@ -1542,6 +1544,8 @@ class AnnasDownloader(TorrentDownloader):
 
 class ArchiveOrgDownloader(HttpDownloader):
     """Archive.Org downloader class implementation"""
+
+    NAME = 'archive'
 
     def __init__(self, args):
         my_config = {
@@ -1697,6 +1701,7 @@ class ArchiveOrgDownloader(HttpDownloader):
 class IndianCultureDownloader(SourceHtmlPageDownloader, HttpDownloader):
     """indianculture.gov.in downloader class implementation"""
 
+    NAME = 'indian-culture'
     BASE_URL = 'https://indianculture.gov.in'
 
     def __init__(self, args):
@@ -1868,6 +1873,8 @@ class IndianCultureDownloader(SourceHtmlPageDownloader, HttpDownloader):
 
 class TelegramDownloader(Downloader):
     """Downloads books from telegram"""
+
+    NAME = 'telegram'
 
     def __init__(self, args):
         my_config = {
@@ -2044,6 +2051,24 @@ class TelegramDownloader(Downloader):
             await self.client.disconnect()
 
 
+def parse_args_common(parser, cache: bool = True):
+    """Defines common command arguments"""
+
+    parser.add_argument('-s', '--save-path', type=str, default='.',
+                        help='Save path (default: current directory)')
+    parser.add_argument('--timeout', type=int, default=DEFAULT_TIMEOUT,
+                        help=f'Timeout for networking operations (default={DEFAULT_TIMEOUT})')
+    parser.add_argument('-n', '--parallelism', type=int, default=DEFAULT_PARALLELISM,
+                        help='Number of parallel downloads. '
+                        'Only useful if more than one url is specified'
+                        f' (default: {DEFAULT_PARALLELISM})')
+    if cache:
+        parser.add_argument('--skip-cache', action='store_true',
+                            help='Skip usage of cache (by default cache is used)')
+    parser.add_argument('--temp-file-path', type=str, default=tempfile.gettempdir(),
+                        help=f'Temp directory (defaults to folder in {tempfile.gettempdir()})')
+
+
 def parse_args_command(parser, list_supported: bool = False,
                        status_supported: bool = False, download_text: str = 'URL'):
     """Create parser for sub commands"""
@@ -2082,22 +2107,13 @@ def parse_args():
 
     parser = argparse.ArgumentParser(
         description='pystak - a tool to download books from various sources')
-    parser.add_argument('-s', '--save-path', type=str, default='.',
-                        help='Save path (default: current directory)')
-    parser.add_argument('--timeout', type=int, default=DEFAULT_TIMEOUT,
-                        help=f'Timeout for downloading of torrent files (default={DEFAULT_TIMEOUT})')
-    parser.add_argument('-n', '--parallelism', type=int, default=DEFAULT_PARALLELISM,
-                        help='Number of parallel downloads. '
-                        'Only useful if more than one url is specified'
-                        f' (default: {DEFAULT_PARALLELISM})')
-    parser.add_argument('--skip-cache', action='store_true',
-                        help='Skip usage of cache (by default cache is used)')
-    parser.add_argument('--temp-file-path', type=str, default=tempfile.gettempdir(),
-                        help=f'Temp directory (defaults to folder in {tempfile.gettempdir()})')
 
-    commands = parser.add_subparsers(dest='command', help='Available commands', required=True)
+    commands = parser.add_subparsers(
+        dest='command', help='Available commands', required=True)
 
-    aa = commands.add_parser('annas', help='Annas archive downloader')
+    aa = commands.add_parser(AnnasDownloader.NAME,
+                             help='Annas archive downloader')
+    parse_args_common(aa)
     aa.add_argument('-c', '--torrent-cache-file', type=str, default=DEFAULT_TORRENT_CACHE,
                     help=f'Cache file for storing torrent data (default: {DEFAULT_TORRENT_CACHE})')
     aa.add_argument('-t', '--no-title-as-filename', action='store_true',
@@ -2112,7 +2128,9 @@ def parse_args():
                     help=f'Port to use for libtorrent (default: {DEFAULT_PORT})')
     parse_args_command(aa, status_supported=True)
 
-    archive = commands.add_parser('archive', help='Archive.org downloader')
+    archive = commands.add_parser(
+        ArchiveOrgDownloader.NAME, help='Archive.org downloader')
+    parse_args_common(archive)
     archive.add_argument('-c', '--cache-file', type=str, default=DEFAULT_ARCHIVE_CACHE,
                          help=f'Cache file for storing archive.org data (default: {DEFAULT_ARCHIVE_CACHE})')
 
@@ -2125,7 +2143,8 @@ def parse_args():
                            help=f'Maximum number of API calls to be made per minute (defaulte{ARCHIVE_ORG_API_LIMIT})')
 
     ind_cult = commands.add_parser(
-        'indian-culture', help='indianculture.gov.in downloader')
+        IndianCultureDownloader.NAME, help='indianculture.gov.in downloader')
+    parse_args_common(ind_cult)
     ind_cult.add_argument('-c', '--cache-file', type=str, default=DEFAULT_IND_CULT_CACHE,
                           help=f'Cache file for storing indianculture.gov.in data (default: {DEFAULT_IND_CULT_CACHE})')
     ind_cult.add_argument('--no-save-metadata', action='store_true',
@@ -2137,7 +2156,8 @@ def parse_args():
     parse_args_command(ind_cult, list_supported=True)
 
     telegram = commands.add_parser(
-        'telegram', help='telegram channel document downloader')
+        TelegramDownloader.NAME, help='Telegram channel downloader')
+    parse_args_common(telegram, False)
     telegram.add_argument('-i', '--api-id', type=str, required=True,
                           help='Your telegram API Id')
     telegram.add_argument('-a', '--api-hash', type=str, required=True,
@@ -2153,7 +2173,46 @@ def parse_args():
     _download.add_argument('-c', '--channel-username', type=str, required=True,
                            help='Telegram channel username')
 
+    _rerun = commands.add_parser(
+        'rerun', help='Rerun a run from supplied run-end*.txt file')
+    _rerun.add_argument('files', type=str, nargs='+',
+                        help='run-end*.txt file(s) to rerun')
+
     return parser.parse_args()
+
+
+async def rerun(args):
+    """Rerun past runs"""
+
+    for file_path in args.files:
+        if not os.path.exists(file_path):
+            print(f':: file not found {file_path}')
+            os.sys.exit(1)
+
+    for file_path in args.files:
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                json_data = json.load(f)
+                run = json_data['run']
+                config = json_data['config']
+                pending_urls = json_data['pending_urls']
+
+                if run == AnnasDownloader.NAME:
+                    command = AnnasDownloader
+                elif run == ArchiveOrgDownloader.NAME:
+                    command = ArchiveOrgDownloader
+                elif run == IndianCultureDownloader.NAME:
+                    command = IndianCultureDownloader
+                elif run == TelegramDownloader.NAME:
+                    command = TelegramDownloader
+                else:
+                    raise ValueError(f'invalid run type: {run}')
+
+                args = argparse.Namespace(**config)
+                await command(args).download(pending_urls)
+
+        except (FileNotFoundError, PermissionError, IOError, IsADirectoryError, ValueError, json.JSONDecodeError) as e:
+            print(f':: Failed to process {file_path}: {e}')
 
 
 async def main():
@@ -2161,11 +2220,14 @@ async def main():
 
     args = parse_args()
 
+    if args.command == 'rerun':
+        return await rerun(args)
+
     data = {
-        'annas': (AnnasDownloader, True, False),
-        'archive': (ArchiveOrgDownloader, False, False),
-        'indian-culture': (IndianCultureDownloader, False, True),
-        'telegram': (TelegramDownloader, False, False),
+        AnnasDownloader.NAME: (AnnasDownloader, True, False),
+        ArchiveOrgDownloader.NAME: (ArchiveOrgDownloader, False, False),
+        IndianCultureDownloader.NAME: (IndianCultureDownloader, False, True),
+        TelegramDownloader.NAME: (TelegramDownloader, False, False),
     }
 
     command, has_status, has_list = data[args.command]
