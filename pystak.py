@@ -154,7 +154,7 @@ class Downloader(ABC):
             'temp_file_path': args.temp_file_path,
             'save_path': args.save_path,
             'skip_cache': args.skip_cache,
-            'download_all': args.download_all,
+            'download_all': args.download_all if hasattr(args, 'download_all') else False,
         }
         self.config = {**my_config, **config}
         self.lock = asyncio.Lock()
